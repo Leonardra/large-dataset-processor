@@ -64,11 +64,15 @@ public class SparkService {
 
         String mongoUri = "mongodb://localhost:27017/";
         Dataset<Row> rowsWithIdColumn = rows.withColumn("id", functions.monotonically_increasing_id());
-       Dataset<Row> groupedRow = rowsWithIdColumn.groupBy("Location").agg(
+       Dataset<Row> groupedRow = rowsWithIdColumn.groupBy(functions.col("Location").alias("location")).agg(
                functions.collect_list(
-                       functions.struct("Domain","Value", "Location", "Transaction_count"
-                       ).as("settlementBreakdowns")
-               )
+                       functions.struct(
+                               functions.date_format(functions.column("Date"), "yyyy-MM-dd HH:mm:ss").alias("settlementDate"),
+                               functions.col("Domain").alias("domain"),
+                               functions.col("Value").alias("value"),
+                               functions.col("Transaction_count").alias("transactionCount")
+                       )
+               ).alias("settlementBreakdowns")
        );
 
         groupedRow.write()
@@ -76,7 +80,8 @@ public class SparkService {
                 .option("spark.mongodb.output.uri", mongoUri)
                 .option("spark.mongodb.output.database", "large_data")
                 .option("spark.mongodb.output.collection", "banks")
-                .mode("append") // Change to "overwrite" or "ignore" as needed
+                .mode("append")
+
                 .save();
     }
 
